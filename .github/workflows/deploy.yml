@@ -43,23 +43,23 @@ jobs:
   deployment:
     runs-on: ubuntu-latest
     needs: build
-    environment: 
-        name: ${{ inputs.environment }} 
-          # url: https://dev-example.com
+    # environment:
+    #    name: ${{ inputs.environment }}
+    #      # url: https://dev-example.com
           
     steps:       
       - name: Set branch
         run: |
           if [ "${{ inputs.branch_override }}" != "" ]; then
-            echo "BRANCH=${{ inputs.branch_override }}" >> $GITHUB_ENV
+            echo "BRANCH_NAME=${{ inputs.branch_override }}" >> $GITHUB_ENV
           elif [ "${{ inputs.environment }}" == "prod" ]; then
-            echo "BRANCH=master" >> $GITHUB_ENV
+            echo "BRANCH_NAME=master" >> $GITHUB_ENV
           elif [ "${{ inputs.environment }}" == "stage" ]; then
-            echo "BRANCH=master" >> $GITHUB_ENV
+            echo "BRANCH_NAME=master" >> $GITHUB_ENV
           elif [ "${{ inputs.environment }}" == "qa" ]; then
-            echo "BRANCH=stage" >> $GITHUB_ENV
+            echo "BRANCH_NAME=stage" >> $GITHUB_ENV
           elif [ "${{ inputs.environment }}" == "dev" ]; then
-            echo "BRANCH=dev" >> $GITHUB_ENV
+            echo "BRANCH_NAME=dev" >> $GITHUB_ENV
           else
             echo "Error: Invalid environment"
             exit 1
@@ -68,13 +68,47 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
         with:
-          ref: ${{ env.BRANCH }}
+          ref: ${{ env.BRANCH_NAME }}
 
       - name: Deploy to environment
         run: |
-          echo "Deploying branch ${{ env.BRANCH }} to ${{ inputs.environment }} environment..."
+          echo "Deploying branch ${{ env.BRANCH_NAME }} to ${{ inputs.environment }} environment..."
 
+      - name: Create Deployment
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -d "{\"ref\":\"${{ env.BRANCH_NAME }}\",\"environment\":\"${{ inputs.environment }}\",\"auto_merge\":false,\"required_contexts\":[]}" \
+            https://api.github.com/repos/${{ github.repository }}/deployments
 
+      - name: Get Deployment ID
+        id: get-deployment-id
+        run: |
+          RESPONSE=$(curl -X GET \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            https://api.github.com/repos/${{ github.repository }}/deployments);
+          DEPLOYMENT_ID=$(echo $RESPONSE | jq '.[0].id');
+          echo $DEPLOYMENT_ID;
+          echo "DEPLOYMENT_ID=$DEPLOYMENT_ID" >> $GITHUB_OUTPUT;
+
+      - name: Log DEPLOYMENT_ID
+        env:
+          DEPLOYMENT_ID: ${{ steps.get-deployment-id.outputs.DEPLOYMENT_ID }}
+        run: echo $DEPLOYMENT_ID
+
+      - name: Update Deployment Status
+        env:
+          DEPLOYMENT_ID: ${{ steps.get-deployment-id.outputs.DEPLOYMENT_ID }}
+        run: |
+          curl -X POST \
+            -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github+json" \
+            -d "{\"state\":\"success\",\"environment\":\"${{ inputs.environment }}\"}" \
+            https://api.github.com/repos/${{ github.repository }}/deployments/$DEPLOYMENT_ID/statuses
+    
+    
 
 
 
