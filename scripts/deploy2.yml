@@ -39,9 +39,9 @@ jobs:
   deployment:
     runs-on: ubuntu-latest
     needs: build
-    environment: 
-        name: ${{ inputs.environment }}
-          # url: https://dev-example.com
+#    environment:
+#        name: ${{ inputs.environment }}
+#          # url: https://dev-example.com
           
     steps:
       # - name: Label Deployment

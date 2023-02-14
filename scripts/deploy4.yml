@@ -1,0 +1,86 @@
+name: CI Deployment 
+
+on:
+  # Triggers the workflow on push or pull request events but only for the "master" branch
+#   push:
+#     branches: [ "master" ]
+#   pull_request:
+#     branches: [ "master" ]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+   inputs:
+    environment:
+      description: Select the environment
+      required: true
+      type: environment
+    branch_override:
+      description: Enter branch
+      required: false
+
+jobs:
+
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      BRANCH_NAME: ${{ steps.branch.outputs.BRANCH_NAME }}
+    steps:
+      - name: Set branch
+        run: |
+          if [ "${{ inputs.branch_override }}" != "" ]; then
+            echo "BRANCH_NAME=${{ inputs.branch_override }}" >> $GITHUB_ENV
+          elif [ "${{ inputs.environment }}" == "prod" ]; then
+            echo "BRANCH_NAME=master" >> $GITHUB_ENV
+          elif [ "${{ inputs.environment }}" == "stage" ]; then
+            echo "BRANCH_NAME=master" >> $GITHUB_ENV
+          elif [ "${{ inputs.environment }}" == "qa" ]; then
+            echo "BRANCH_NAME=stage" >> $GITHUB_ENV
+          elif [ "${{ inputs.environment }}" == "dev" ]; then
+            echo "BRANCH_NAME=dev" >> $GITHUB_ENV
+          else
+            echo "Error: Invalid environment"
+            exit 1
+          fi
+          
+      - name: Output branch
+        id: branch
+        run: |
+          echo "BRANCH_NAME=${{ env.BRANCH_NAME }}" >> $GITHUB_OUTPUT
+          
+      - uses: actions/checkout@v3
+        with:
+          ref: ${{ env.BRANCH_NAME }}
+
+      # Runs a single command using the runners shell
+      - name: Run a one-line script
+        run: echo Hello, world!
+
+      # Runs a set of commands using the runners shell
+      - name: Run a multi-line script
+        run: |
+          echo Add other actions to build,
+          echo test, and deploy your project.
+      
+  deployment:
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+       name: ${{ inputs.environment }}
+         # url: https://dev-example.com
+          
+    steps:
+      - name: Set branch
+        run: |
+          echo "BRANCH_NAME=${{ needs.build.outputs.BRANCH_NAME }}" >> $GITHUB_ENV
+
+      - name: Checkout code
+        uses: actions/checkout@v3
+        with:
+          ref: ${{ env.BRANCH_NAME }}
+
+      - name: Deploy to environment
+        run: |
+          echo "Deploying branch ${{ env.BRANCH_NAME }} to ${{ inputs.environment }} environment..."
+
+
+
