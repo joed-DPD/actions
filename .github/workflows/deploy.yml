@@ -6,6 +6,14 @@ on:
   #     branches: [ "master" ]
   #   pull_request:
   #     branches: [ "master" ]
+  
+  pull_request:
+    types:
+      - closed
+    branches:
+      - master
+      - stage
+      - dev
 
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
@@ -14,6 +22,7 @@ on:
         description: Select the environment
         required: true
         type: environment
+        default: dev
       branch_override:
         description: Enter branch
         required: false
