@@ -12,68 +12,73 @@ on:
   # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
     inputs:
-      environment_override:
-        type: choice
-        description: Enter environment override
+      environment:
+        description: Select the environment
+        required: true
+        type: environment
+      branch_override:
+        description: Enter branch override
         required: false
-        options: 
-        - ''
-        - d1
-        - q1
-        - q2
-        - l1
-  
 
 # env:
 #   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 #   PAT: ${{ secrets.PAT }}
-
-env:
-  BRANCH_NAME: ${{ github.base_branch || github.head_ref || github.ref_name }}
 
 jobs:
 
   build:
     runs-on: ubuntu-latest
     outputs:
-      ENVIRONMENT_NAME: ${{ steps.environment.outputs.ENVIRONMENT_NAME }}
+      BRANCH_NAME: ${{ steps.branch.outputs.BRANCH_NAME }}
+      ENVIRONMENT_NAME: ${{ steps.branch.outputs.ENVIRONMENT_NAME }}
       
     steps:
+      - name: Set branch for workflow_dispatch event
+        if: ${{ github.event_name == 'workflow_dispatch' }}
+        run: |
+          if [ "${{ inputs.branch_override }}" != "" ]; then
+            echo "BRANCH_NAME=${{ inputs.branch_override }}" >> $GITHUB_ENV
+          elif [ "${{ inputs.environment }}" == "l1" ]; then
+            echo "BRANCH_NAME=master" >> $GITHUB_ENV
+          elif [ "${{ inputs.environment }}" == "q2" ]; then
+            echo "BRANCH_NAME=master" >> $GITHUB_ENV
+          elif [ "${{ inputs.environment }}" == "q1" ]; then
+            echo "BRANCH_NAME=stage" >> $GITHUB_ENV
+          elif [ "${{ inputs.environment }}" == "d1" ]; then
+            echo "BRANCH_NAME=dev" >> $GITHUB_ENV
+          else
+            echo "Error: Invalid environment"
+            exit 1
+          fi
+          
+      - name: Set branch for pull_request event
+        if: ${{ github.event_name == 'pull_request' }}
+        run: |
+          echo "BRANCH_NAME=${{ github.base_branch }}" >> $GITHUB_ENV
           
       - name: Set environment for workflow_dispatch event
         if: ${{ github.event_name == 'workflow_dispatch' }}
         run: |
-          if [ "${{ inputs.environment_override }}" != "" ]; then
-            echo "ENVIRONMENT_NAME=${{ inputs.environment_override }}" >> $GITHUB_ENV
-          elif [ "${{ env.BRANCH_NAME }}" == "dev" ]; then
-            echo "ENVIRONMENT_NAME=d1" >> $GITHUB_ENV
-          elif [ "${{ env.BRANCH_NAME }}" == "stage" ]; then
-            echo "ENVIRONMENT_NAME=q1" >> $GITHUB_ENV
-          elif [ "${{ env.BRANCH_NAME }}" == "master" ]; then
-            echo "ENVIRONMENT_NAME=q2" >> $GITHUB_ENV
-          else
-            echo "Error: Invalid base_branch - need to specfiy environment override"
-            exit 1
-          fi
+          echo "ENVIRONMENT_NAME=${{ inputs.environment }}" >> $GITHUB_ENV
       
       - name: Set environment for pull_request event
         if: ${{ github.event_name == 'pull_request' }}
         run: |
-          if [ "${{ env.BRANCH_NAME }}" == "dev" ]; then
-            echo "ENVIRONMENT_NAME=d1" >> $GITHUB_ENV
-          elif [ "${{ env.BRANCH_NAME }}" == "stage" ]; then
-            echo "ENVIRONMENT_NAME=q1" >> $GITHUB_ENV
-          elif [ "${{ env.BRANCH_NAME }}" == "master" ]; then
+          if [ "${{ github.base_branch }}" == "master" ]; then
             echo "ENVIRONMENT_NAME=q2" >> $GITHUB_ENV
+          elif [ "${{ github.base_branch }}" == "stage" ]; then
+            echo "ENVIRONMENT_NAME=q1" >> $GITHUB_ENV
+          elif [ "${{ github.base_branch }}" == "dev" ]; then
+            echo "ENVIRONMENT_NAME=d1" >> $GITHUB_ENV
           else
-            #TODO what happens for l1?
             echo "Error: Invalid base_branch"
             exit 1
           fi
       
-      - name: Output environment
-        id: environment
+      - name: Output branch and environment
+        id: branch
         run: |
+          echo "BRANCH_NAME=${{ env.BRANCH_NAME }}" >> $GITHUB_OUTPUT;
           echo "ENVIRONMENT_NAME=${{ env.ENVIRONMENT_NAME }}" >> $GITHUB_OUTPUT;
 
       - name: Get commit hash
@@ -113,8 +118,9 @@ jobs:
       url: https://example.com/environments/${{ needs.build.outputs.ENVIRONMENT_NAME }}
     
     steps:
-      - name: Set environment
+      - name: Set branch and environment
         run: |
+          echo "BRANCH_NAME=${{ needs.build.outputs.BRANCH_NAME }}" >> $GITHUB_ENV;
           echo "ENVIRONMENT_NAME=${{ needs.build.outputs.ENVIRONMENT_NAME }}" >> $GITHUB_ENV;
 
       - name: Get commit hash
