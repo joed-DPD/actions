@@ -29,7 +29,7 @@ on:
 #   PAT: ${{ secrets.PAT }}
 
 env:
-  BRANCH_NAME: ${{ github.base_branch || github.head_ref || github.ref_name }}
+  BRANCH_NAME: ${{ github.event.pull_request.base.ref || github.head_ref || github.ref_name }}
 
 jobs:
 
